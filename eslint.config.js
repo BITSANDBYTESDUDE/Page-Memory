@@ -6,7 +6,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
   {
-    ignores: ['dist/', 'node_modules/'],
+    ignores: ['.kilo/', 'dist/', 'node_modules/'],
   },
   eslint.configs.recommended,
   {
@@ -21,6 +21,7 @@ export default [
         chrome: 'readonly',
         console: 'readonly',
         document: 'readonly',
+        window: 'readonly',
       },
     },
     plugins: {

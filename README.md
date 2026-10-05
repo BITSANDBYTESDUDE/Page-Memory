@@ -146,32 +146,27 @@ PageMemory is built as a modern Chrome Manifest V3 extension.
                            │
                            ▼
                   ┌─────────────────┐
-                  │   Content Script │
-                  │                 │
-                  │ Reading Tracker │
+                  │ Popup / Options │
+                  │   React UI      │
                   └────────┬────────┘
-                           │
+                           │ Typed messages
                            ▼
                   ┌─────────────────┐
                   │ Service Worker  │
-                  │                 │
-                  │ Background Logic│
+                  │ Message router │
                   └────────┬────────┘
                            │
                            ▼
                   ┌─────────────────┐
-                  │ Storage Layer   │
-                  │                 │
-                  │ chrome.storage  │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ React Interface │
-                  │                 │
-                  │ Popup / Options │
+                  │ Content Script  │
+                  │ Page metadata   │
                   └─────────────────┘
 ```
+
+The extension uses a centralized typed request/reply protocol. The service worker
+routes page metadata requests to the content script. Persistent page and settings
+data are accessed through repositories backed by a schema-versioned
+`chrome.storage.local` service; UI code does not access Chrome storage directly.
 
 ---
 
@@ -199,39 +194,35 @@ PageMemory/
 │
 ├── src/
 │   ├── background/
-│   │   ├── service-worker.ts
-│   │   └── message-router.ts
-│   │
+│   │   └── index.ts
 │   ├── content/
-│   │   ├── tracker.ts
-│   │   ├── reader.ts
-│   │   └── restoration.ts
-│   │
-│   ├── popup/
-│   │   ├── App.tsx
-│   │   ├── components/
-│   │   └── pages/
-│   │
-│   ├── options/
-│   │
-│   ├── components/
-│   │
-│   ├── services/
-│   │
-│   ├── storage/
-│   │
-│   ├── types/
-│   │
+│   │   └── index.ts
 │   ├── hooks/
-│   │
-│   └── utils/
+│   │   └── useCurrentPage.ts
+│   ├── messaging/
+│   │   ├── chrome.ts
+│   │   ├── client.ts
+│   │   └── protocol.ts
+│   ├── popup/
+│   │   ├── main.tsx
+│   │   └── Popup.tsx
+│   ├── options/
+│   │   └── main.tsx
+│   ├── storage/
+│   │   ├── models.ts
+│   │   ├── PageRepository.ts
+│   │   ├── SettingsRepository.ts
+│   │   ├── StorageService.ts
+│   │   ├── errors.ts
+│   │   ├── validation.ts
+│   │   └── repositories.test.ts
+│   └── types/
+│       └── index.ts
 │
 ├── public/
-│   └── icons/
-│
-├── tests/
-│
-├── manifest.json
+│   └── manifest.json
+├── popup.html
+├── options.html
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts

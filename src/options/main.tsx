@@ -12,8 +12,8 @@ function Options() {
         <p className="mt-2 text-slate-600">Configure your reading memory experience.</p>
         <div className="mt-8">
           <PlaceholderCard
-            title="Settings are coming soon"
-            description="The options page is wired into the extension and ready for future preferences."
+            title="No preferences yet"
+            description="This page is part of the extension runtime. Settings and local page storage have not been implemented yet."
           />
         </div>
       </div>
