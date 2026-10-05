@@ -1,4 +1,5 @@
 import type { RuntimeReply, RuntimeRequest } from '../types';
+import { extractPageMetadata } from '../utils/pageMetadata';
 
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   if (
@@ -14,7 +15,7 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
   const reply: RuntimeReply<'GET_CURRENT_PAGE'> = {
     type: request.type,
     ok: true,
-    value: { url: window.location.href, title: document.title },
+    value: extractPageMetadata(document, window.location.href),
   };
   sendResponse(reply);
   return false;

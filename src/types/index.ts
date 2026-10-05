@@ -11,8 +11,25 @@ export const MESSAGE_TYPES = [
 export type MessageType = (typeof MESSAGE_TYPES)[number];
 
 export interface PageInfo {
+  readonly pageId: string;
   readonly url: string;
+  readonly canonicalUrl: string;
   readonly title: string;
+  readonly hostname: string;
+  readonly domain: string;
+  readonly favicon: string | null;
+}
+
+export type PageMetadata = PageInfo;
+
+export interface PageLookupResult {
+  readonly isSaved: boolean;
+}
+
+export interface PageSaveResult {
+  readonly pageId: string;
+  readonly created: boolean;
+  readonly lastReadAt: string;
 }
 
 export interface ReadingProgress {
@@ -31,8 +48,8 @@ export interface RequestPayloads {
 
 export interface ResponsePayloads {
   readonly GET_CURRENT_PAGE: PageInfo;
-  readonly SAVE_PAGE: null;
-  readonly GET_PAGE: PageInfo | null;
+  readonly SAVE_PAGE: PageSaveResult;
+  readonly GET_PAGE: PageLookupResult;
   readonly UPDATE_PROGRESS: null;
   readonly RESTORE_POSITION: null;
 }

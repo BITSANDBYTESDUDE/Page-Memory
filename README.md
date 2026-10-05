@@ -167,6 +167,15 @@ The extension uses a centralized typed request/reply protocol. The service worke
 routes page metadata requests to the content script. Persistent page and settings
 data are accessed through repositories backed by a schema-versioned
 `chrome.storage.local` service; UI code does not access Chrome storage directly.
+The popup checks the current page's canonical URL and saves through the service
+worker. Repeated saves update the existing record's `lastReadAt` instead of
+creating duplicates.
+Page metadata extraction is limited to the address, canonical link, title,
+hostname/domain, favicon link, and generated page ID. It does not inspect page
+text, forms, cookies, or other user-entered content. Query parameters are
+preserved as part of the page URL; URL credentials and fragments are excluded
+from normalized/canonical URLs, and embedded or recipient URL schemes are
+rejected.
 
 ---
 
@@ -195,6 +204,10 @@ PageMemory/
 ├── src/
 │   ├── background/
 │   │   └── index.ts
+│   ├── utils/
+│   │   ├── pageMetadata.ts
+│   │   ├── pageMetadata.test.ts
+│   │   └── url.ts
 │   ├── content/
 │   │   └── index.ts
 │   ├── hooks/
@@ -203,6 +216,9 @@ PageMemory/
 │   │   ├── chrome.ts
 │   │   ├── client.ts
 │   │   └── protocol.ts
+│   ├── services/
+│   │   ├── saveCurrentPage.ts
+│   │   └── saveCurrentPage.test.ts
 │   ├── popup/
 │   │   ├── main.tsx
 │   │   └── Popup.tsx

@@ -2,6 +2,7 @@ import {
   MESSAGE_TYPES,
   type MessageType,
   type PageInfo,
+  type ResponsePayloads,
   type RuntimeError,
   type RuntimeReply,
   type RuntimeRequest,
@@ -11,7 +12,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
 const isPageInfo = (value: unknown): value is PageInfo =>
-  isRecord(value) && typeof value.url === 'string' && typeof value.title === 'string';
+  isRecord(value) &&
+  typeof value.pageId === 'string' &&
+  typeof value.url === 'string' &&
+  typeof value.canonicalUrl === 'string' &&
+  typeof value.title === 'string' &&
+  typeof value.hostname === 'string' &&
+  typeof value.domain === 'string' &&
+  (typeof value.favicon === 'string' || value.favicon === null);
 
 const isMessageType = (value: unknown): value is MessageType =>
   typeof value === 'string' && MESSAGE_TYPES.some((type) => type === value);
@@ -84,8 +92,17 @@ export function isRuntimeReply<K extends MessageType>(
     case 'GET_CURRENT_PAGE':
       return isPageInfo(value.value);
     case 'GET_PAGE':
-      return value.value === null || isPageInfo(value.value);
+      return (
+        isRecord(value.value) &&
+        typeof value.value.isSaved === 'boolean'
+      );
     case 'SAVE_PAGE':
+      return (
+        isRecord(value.value) &&
+        typeof value.value.pageId === 'string' &&
+        typeof value.value.created === 'boolean' &&
+        typeof value.value.lastReadAt === 'string'
+      );
     case 'UPDATE_PROGRESS':
     case 'RESTORE_POSITION':
       return value.value === null;
@@ -94,7 +111,7 @@ export function isRuntimeReply<K extends MessageType>(
 
 export function success<K extends MessageType>(
   type: K,
-  value: RuntimeReply<K> extends { readonly ok: true; readonly value: infer V } ? V : never,
+  value: ResponsePayloads[K],
 ): RuntimeReply<K> {
   return { type, ok: true, value } as RuntimeReply<K>;
 }

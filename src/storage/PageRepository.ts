@@ -2,14 +2,17 @@ import { StorageError } from './errors';
 import type { CreatePageInput, PageRecord, UpdatePageInput } from './models';
 import { StorageService, storageService } from './StorageService';
 import { validatePageInput } from './validation';
+import { normalizePageUrl, UrlNormalizationError } from '../utils/url';
+import type { PageInfo } from '../types';
 
-function normalizeUrl(url: string): { canonicalUrl: string; domain: string } {
+function normalizeStorageUrl(url: string): ReturnType<typeof normalizePageUrl> {
   try {
-    const parsed = new URL(url);
-    parsed.hash = '';
-    return { canonicalUrl: parsed.toString(), domain: parsed.hostname };
+    return normalizePageUrl(url);
   } catch (error: unknown) {
-    throw new StorageError('INVALID_INPUT', `Page URL "${url}" is invalid.`, error);
+    if (error instanceof UrlNormalizationError) {
+      throw new StorageError('INVALID_INPUT', error.message, error);
+    }
+    throw error;
   }
 }
 
@@ -21,7 +24,7 @@ export class PageRepository {
   constructor(private readonly storage: StorageService = storageService) {}
 
   async createPage(input: CreatePageInput): Promise<PageRecord> {
-    const normalizedUrl = normalizeUrl(input.url);
+    const normalizedUrl = normalizeStorageUrl(input.url);
     const timestamp = now();
     const page: PageRecord = validatePageInput({
       id: globalThis.crypto.randomUUID(),
@@ -62,13 +65,78 @@ export class PageRepository {
     return page;
   }
 
+  async savePage(metadata: PageInfo): Promise<{ page: PageRecord; created: boolean }> {
+    const normalizedUrl = normalizeStorageUrl(metadata.url);
+    const normalizedCanonicalUrl = normalizeStorageUrl(metadata.canonicalUrl);
+    const timestamp = now();
+    let savedPage: PageRecord | undefined;
+    let created = false;
+
+    await this.storage.updateDatabase((database) => {
+      const existing = Object.values(database.pages).find(
+        (page) => page.canonicalUrl === normalizedCanonicalUrl.canonicalUrl,
+      );
+
+      if (existing) {
+        savedPage = validatePageInput({
+          ...existing,
+          lastReadAt: timestamp,
+          updatedAt: timestamp,
+        });
+        return {
+          ...database,
+          pages: { ...database.pages, [existing.id]: savedPage },
+        };
+      }
+
+      const page = validatePageInput({
+        id: metadata.pageId,
+        url: normalizedUrl.url,
+        canonicalUrl: normalizedCanonicalUrl.canonicalUrl,
+        title: metadata.title,
+        domain: normalizedUrl.domain,
+        favicon: metadata.favicon,
+        progress: 0,
+        scrollY: 0,
+        scrollHeight: 0,
+        lastReadAt: timestamp,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        isFavorite: false,
+        tags: [],
+        notes: '',
+        collectionId: null,
+      });
+
+      if (database.pages[page.id]) {
+        throw new StorageError(
+          'DUPLICATE_PAGE',
+          `A page with ID "${page.id}" already exists for another URL.`,
+        );
+      }
+
+      savedPage = page;
+      created = true;
+      return {
+        ...database,
+        pages: { ...database.pages, [page.id]: page },
+      };
+    });
+
+    if (!savedPage) {
+      throw new StorageError('WRITE_FAILED', 'The saved page was not returned from storage.');
+    }
+
+    return { page: savedPage, created };
+  }
+
   async getPage(id: string): Promise<PageRecord | null> {
     const database = await this.storage.getDatabase();
     return database.pages[id] ?? null;
   }
 
   async getPageByUrl(url: string): Promise<PageRecord | null> {
-    const normalizedUrl = normalizeUrl(url);
+    const normalizedUrl = normalizeStorageUrl(url);
     const database = await this.storage.getDatabase();
     return (
       Object.values(database.pages).find(
@@ -95,7 +163,7 @@ export class PageRepository {
         }
 
         const urlChanged = input.url !== undefined && input.url !== existing.url;
-        const normalizedUrl = urlChanged ? normalizeUrl(input.url) : null;
+        const normalizedUrl = urlChanged ? normalizeStorageUrl(input.url) : null;
         const updated: PageRecord = validatePageInput({
           ...existing,
           ...input,
