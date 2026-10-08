@@ -1,4 +1,5 @@
 import type { CurrentPageState } from '../hooks/useCurrentPage';
+import { Button, ErrorState } from '../components/ui';
 
 interface PopupProps {
   readonly state: CurrentPageState;
@@ -30,12 +31,10 @@ export function Popup({ state, onRetry, onSave }: PopupProps) {
               {state.page.title || state.page.url}
             </p>
             <p className="mt-1 break-all text-xs text-slate-500">{state.page.url}</p>
-            <button
-              aria-live="polite"
-              className="mt-4 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+            <Button
+              className="mt-4 w-full"
               disabled={state.saveStatus === 'saving' || state.saveStatus === 'saved'}
               onClick={onSave}
-              type="button"
             >
               {state.saveStatus === 'saving'
                 ? 'Saving…'
@@ -44,7 +43,7 @@ export function Popup({ state, onRetry, onSave }: PopupProps) {
                   : state.saveStatus === 'error'
                     ? 'Try saving again'
                     : 'Save page'}
-            </button>
+            </Button>
             {state.saveStatus === 'saved' && (
               <p className="mt-2 text-sm text-emerald-700">This page is saved.</p>
             )}
@@ -60,14 +59,14 @@ export function Popup({ state, onRetry, onSave }: PopupProps) {
         )}
         {state.status === 'error' && (
           <div className="mt-2">
-            <p className="text-sm text-rose-700">{state.message}</p>
-            <button
-              className="mt-4 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-              onClick={onRetry}
-              type="button"
-            >
-              Try again
-            </button>
+            <ErrorState
+              action={
+                <Button onClick={onRetry} size="sm">
+                  Try again
+                </Button>
+              }
+              message={state.message}
+            />
           </div>
         )}
       </section>
