@@ -6,6 +6,7 @@ import {
   type RuntimeError,
   type RuntimeReply,
   type RuntimeRequest,
+  type StoredReadingState,
 } from '../types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -20,6 +21,17 @@ const isPageInfo = (value: unknown): value is PageInfo =>
   typeof value.hostname === 'string' &&
   typeof value.domain === 'string' &&
   (typeof value.favicon === 'string' || value.favicon === null);
+
+const isStoredReadingState = (value: unknown): value is StoredReadingState =>
+  value === null ||
+  (isRecord(value) &&
+    typeof value.scrollY === 'number' &&
+    Number.isFinite(value.scrollY) &&
+    typeof value.scrollHeight === 'number' &&
+    Number.isFinite(value.scrollHeight) &&
+    typeof value.progress === 'number' &&
+    Number.isFinite(value.progress) &&
+    (typeof value.lastReadAt === 'string' || value.lastReadAt === null));
 
 const isMessageType = (value: unknown): value is MessageType =>
   typeof value === 'string' && MESSAGE_TYPES.some((type) => type === value);
@@ -38,10 +50,12 @@ export function parseRuntimeRequest(value: unknown): RuntimeRequest | null {
     case 'GET_CURRENT_PAGE':
       return { type: value.type };
     case 'SAVE_PAGE':
-      return isPageInfo(value.payload)
-        ? { type: value.type, payload: value.payload }
-        : null;
+      return isPageInfo(value.payload) ? { type: value.type, payload: value.payload } : null;
     case 'GET_PAGE':
+      return isRecord(value.payload) && typeof value.payload.url === 'string'
+        ? { type: value.type, payload: { url: value.payload.url } }
+        : null;
+    case 'GET_READING_STATE':
       return isRecord(value.payload) && typeof value.payload.url === 'string'
         ? { type: value.type, payload: { url: value.payload.url } }
         : null;
@@ -92,10 +106,9 @@ export function isRuntimeReply<K extends MessageType>(
     case 'GET_CURRENT_PAGE':
       return isPageInfo(value.value);
     case 'GET_PAGE':
-      return (
-        isRecord(value.value) &&
-        typeof value.value.isSaved === 'boolean'
-      );
+      return isRecord(value.value) && typeof value.value.isSaved === 'boolean';
+    case 'GET_READING_STATE':
+      return isStoredReadingState(value.value);
     case 'SAVE_PAGE':
       return (
         isRecord(value.value) &&

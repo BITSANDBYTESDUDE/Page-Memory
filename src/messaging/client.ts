@@ -1,9 +1,4 @@
-import type {
-  PageInfo,
-  ReadingProgress,
-  RuntimeReply,
-  RuntimeRequest,
-} from '../types';
+import type { PageInfo, ReadingProgress, RuntimeReply, RuntimeRequest } from '../types';
 import { sendRuntimeMessage } from './chrome';
 
 function request<K extends RuntimeRequest['type']>(
@@ -22,6 +17,10 @@ export function savePage(page: PageInfo): Promise<RuntimeReply<'SAVE_PAGE'>> {
 
 export function getPage(url: string): Promise<RuntimeReply<'GET_PAGE'>> {
   return request({ type: 'GET_PAGE', payload: { url } });
+}
+
+export function getReadingState(url: string): Promise<RuntimeReply<'GET_READING_STATE'>> {
+  return request({ type: 'GET_READING_STATE', payload: { url } });
 }
 
 export function updateProgress(

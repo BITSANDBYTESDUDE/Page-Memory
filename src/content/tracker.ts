@@ -8,7 +8,13 @@ export type ReadingTrackerWindow = Pick<
 
 export type ReadingTrackerDocument = Pick<
   Document,
-  'documentElement' | 'body' | 'defaultView' | 'URL'
+  | 'documentElement'
+  | 'body'
+  | 'defaultView'
+  | 'URL'
+  | 'visibilityState'
+  | 'addEventListener'
+  | 'removeEventListener'
 >;
 
 type ResizeObserverLike = {
@@ -48,8 +54,14 @@ const createBrowserEnvironment = (): ReadingTrackerEnvironment => ({
   document: globalThis.document,
   setTimeout: globalThis.setTimeout,
   clearTimeout: globalThis.clearTimeout,
-  createResizeObserver: (callback) => new globalThis.ResizeObserver(callback),
-  createMutationObserver: (callback) => new globalThis.MutationObserver(callback),
+  createResizeObserver:
+    typeof globalThis.ResizeObserver === 'function'
+      ? (callback) => new globalThis.ResizeObserver(callback)
+      : undefined,
+  createMutationObserver:
+    typeof globalThis.MutationObserver === 'function'
+      ? (callback) => new globalThis.MutationObserver(callback)
+      : undefined,
 });
 
 export function createReadingTracker(
@@ -76,10 +88,13 @@ export function createReadingTracker(
     };
   };
 
-  const sendCurrentPosition = (): void => {
+  const sendCurrentPosition = (isFinal = false): void => {
+    if (pendingTimer !== undefined) {
+      environment.clearTimeout(pendingTimer);
+    }
     pendingTimer = undefined;
     if (!stopped) {
-      sendUpdate(collectUpdate());
+      sendUpdate({ ...collectUpdate(), isFinal });
     }
   };
 
@@ -93,9 +108,17 @@ export function createReadingTracker(
 
   const onScroll = (): void => scheduleUpdate();
   const onResize = (): void => scheduleUpdate();
+  const onPageHide = (): void => sendCurrentPosition(true);
+  const onVisibilityChange = (): void => {
+    if (environment.document.visibilityState === 'hidden') {
+      sendCurrentPosition(true);
+    }
+  };
 
   environment.window.addEventListener('scroll', onScroll, { passive: true });
   environment.window.addEventListener('resize', onResize, { passive: true });
+  environment.window.addEventListener('pagehide', onPageHide);
+  environment.document.addEventListener('visibilitychange', onVisibilityChange);
 
   const resizeObserver = environment.createResizeObserver?.(() => scheduleUpdate());
   if (resizeObserver) {
@@ -117,6 +140,8 @@ export function createReadingTracker(
     stopped = true;
     environment.window.removeEventListener('scroll', onScroll);
     environment.window.removeEventListener('resize', onResize);
+    environment.window.removeEventListener('pagehide', onPageHide);
+    environment.document.removeEventListener('visibilitychange', onVisibilityChange);
     resizeObserver?.disconnect();
     mutationObserver?.disconnect();
 

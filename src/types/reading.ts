@@ -5,4 +5,12 @@ export type ReadingPositionUpdate = {
   readonly scrollHeight: number;
   readonly viewportHeight: number;
   readonly progress: number;
+  readonly isFinal?: boolean;
+};
+
+export type StoredReadingState = {
+  readonly scrollY: number;
+  readonly scrollHeight: number;
+  readonly progress: number;
+  readonly lastReadAt: string | null;
 };

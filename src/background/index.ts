@@ -1,14 +1,13 @@
 import type { RuntimeReply, RuntimeRequest } from '../types';
 import type { ReadingPositionUpdate } from '../types/reading';
 import { failureForRequest, success } from '../messaging/protocol';
-import {
-  getActiveTabId,
-  registerRuntimeHandler,
-  sendTabMessage,
-} from '../messaging/chrome';
+import { getActiveTabId, registerRuntimeHandler, sendTabMessage } from '../messaging/chrome';
 import { pageRepository } from '../storage/PageRepository';
 import { StorageError } from '../storage/errors';
 import { saveCurrentPage } from '../services/saveCurrentPage';
+import { ReadingProgressPersister } from '../services/persistReadingProgress';
+
+const readingProgressPersister = new ReadingProgressPersister(pageRepository);
 
 async function handleRuntimeRequest(request: RuntimeRequest): Promise<RuntimeReply> {
   switch (request.type) {
@@ -34,8 +33,7 @@ async function handleRuntimeRequest(request: RuntimeRequest): Promise<RuntimeRep
       try {
         return success('SAVE_PAGE', await saveCurrentPage(request.payload));
       } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : 'Could not save the current page.';
+        const message = error instanceof Error ? error.message : 'Could not save the current page.';
         const code =
           error instanceof StorageError && error.code === 'INVALID_INPUT'
             ? 'INVALID_REQUEST'
@@ -49,6 +47,29 @@ async function handleRuntimeRequest(request: RuntimeRequest): Promise<RuntimeRep
       } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : 'Could not check whether the page is saved.';
+        const code =
+          error instanceof StorageError && error.code === 'INVALID_INPUT'
+            ? 'INVALID_REQUEST'
+            : 'INTERNAL';
+        return failureForRequest(request, code, message);
+      }
+    case 'GET_READING_STATE':
+      try {
+        const page = await pageRepository.getPageByUrl(request.payload.url);
+        return success(
+          'GET_READING_STATE',
+          page
+            ? {
+                scrollY: page.scrollY,
+                scrollHeight: page.scrollHeight,
+                progress: page.progress,
+                lastReadAt: page.lastReadAt,
+              }
+            : null,
+        );
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Could not retrieve reading progress.';
         const code =
           error instanceof StorageError && error.code === 'INVALID_INPUT'
             ? 'INVALID_REQUEST'
@@ -80,13 +101,26 @@ chrome.runtime.onMessage.addListener((message: unknown, sender) => {
     tabId: sender.tab?.id,
     progress: message.progress,
   });
+  readingProgressPersister.schedule(message);
 });
 
 function isReadingPositionUpdate(message: unknown): message is ReadingPositionUpdate {
+  if (typeof message !== 'object' || message === null || !('type' in message)) {
+    return false;
+  }
+
+  const candidate = message as Record<string, unknown>;
   return (
-    typeof message === 'object' &&
-    message !== null &&
-    'type' in message &&
-    message.type === 'READING_POSITION_UPDATE'
+    candidate.type === 'READING_POSITION_UPDATE' &&
+    typeof candidate.url === 'string' &&
+    typeof candidate.scrollY === 'number' &&
+    Number.isFinite(candidate.scrollY) &&
+    typeof candidate.scrollHeight === 'number' &&
+    Number.isFinite(candidate.scrollHeight) &&
+    typeof candidate.viewportHeight === 'number' &&
+    Number.isFinite(candidate.viewportHeight) &&
+    typeof candidate.progress === 'number' &&
+    Number.isFinite(candidate.progress) &&
+    (candidate.isFinal === undefined || typeof candidate.isFinal === 'boolean')
   );
 }

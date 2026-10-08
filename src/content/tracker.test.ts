@@ -23,6 +23,15 @@ function createEnvironment() {
     body,
     defaultView: windowRef,
     URL: 'https://example.com/long-article',
+    visibilityState: 'visible',
+    addEventListener: vi.fn((event: string, listener: EventListener) => {
+      listeners.set(`document:${event}`, listener);
+    }),
+    removeEventListener: vi.fn((event: string, listener: EventListener) => {
+      if (listeners.get(`document:${event}`) === listener) {
+        listeners.delete(`document:${event}`);
+      }
+    }),
   } as unknown as ReadingTrackerEnvironment['document'];
   const environment: ReadingTrackerEnvironment = {
     window: windowRef,
@@ -71,7 +80,7 @@ describe('createReadingTracker', () => {
     listeners.get('scroll')?.(new Event('scroll'));
     flushTimer();
 
-    expect(environment.window.removeEventListener).toHaveBeenCalledTimes(2);
+    expect(environment.window.removeEventListener).toHaveBeenCalledTimes(3);
     expect(environment.clearTimeout).toHaveBeenCalledTimes(0);
     expect(sendUpdate).toHaveBeenCalledTimes(1);
   });
