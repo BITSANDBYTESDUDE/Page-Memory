@@ -1,75 +1,342 @@
-import type { CurrentPageState } from '../hooks/useCurrentPage';
-import { Button, ErrorState } from '../components/ui';
+import { useMemo, useState } from 'react';
+import type { PopupState } from '../hooks/useCurrentPage';
+import type { SavedPageSummary } from '../types';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  IconButton,
+  LoadingState,
+  ProgressBar,
+  SearchInput,
+} from '../components/ui';
+import { openOptionsPage } from '../messaging/chrome';
 
 interface PopupProps {
-  readonly state: CurrentPageState;
+  readonly state: PopupState;
   readonly onRetry: () => void;
   readonly onSave: () => void;
 }
 
-export function Popup({ state, onRetry, onSave }: PopupProps) {
+function recentTimestamp(timestamp: string | null): string {
+  if (!timestamp) return 'Not read yet';
+  const parsed = Date.parse(timestamp);
+  if (!Number.isFinite(parsed)) return 'Recently read';
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(parsed);
+}
+
+function findContinuePage(pages: readonly SavedPageSummary[]): SavedPageSummary | null {
   return (
-    <main className="min-h-[360px] w-[360px] bg-slate-50 p-5">
-      <header className="mb-5">
-        <p className="text-sm font-semibold text-indigo-600">PageMemory</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
-          Remember where you left off.
-        </h1>
+    [...pages].sort((left, right) => {
+      const leftDate = left.lastReadAt ? Date.parse(left.lastReadAt) : 0;
+      const rightDate = right.lastReadAt ? Date.parse(right.lastReadAt) : 0;
+      return rightDate - leftDate;
+    })[0] ?? null
+  );
+}
+
+function PageFavicon({ page }: { readonly page: SavedPageSummary }) {
+  const [failed, setFailed] = useState(false);
+  if (!page.favicon || failed) {
+    return (
+      <span
+        aria-hidden="true"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-indigo-50 text-sm font-semibold text-indigo-700"
+      >
+        {page.domain.slice(0, 1).toUpperCase() || 'P'}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      alt=""
+      className="h-9 w-9 shrink-0 rounded-lg border border-slate-100 bg-white object-contain p-1"
+      onError={() => setFailed(true)}
+      src={page.favicon}
+    />
+  );
+}
+
+function PageRow({ page }: { readonly page: SavedPageSummary }) {
+  return (
+    <a
+      className="flex min-w-0 items-center gap-3 rounded-lg p-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+      href={page.url}
+      rel="noreferrer"
+      target="_blank"
+      title={`Open ${page.title || page.domain}`}
+    >
+      <PageFavicon page={page} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-slate-800">
+          {page.title || page.domain}
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-slate-500">
+          {page.domain} · {recentTimestamp(page.lastReadAt)}
+        </span>
+      </span>
+      <span aria-hidden="true" className="shrink-0 text-slate-400">
+        ↗
+      </span>
+    </a>
+  );
+}
+
+export function Popup({ state, onRetry, onSave }: PopupProps) {
+  const [search, setSearch] = useState('');
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pages = state.status === 'ready' ? state.pages : [];
+  const continuePage = findContinuePage(pages);
+
+  const searchQuery = search.trim().toLocaleLowerCase();
+  const recentPages = useMemo(() => {
+    return pages
+      .filter((page) => {
+        if (!searchQuery) return true;
+        return `${page.title} ${page.domain} ${page.url}`.toLocaleLowerCase().includes(searchQuery);
+      })
+      .slice(0, 6);
+  }, [pages, searchQuery]);
+
+  const handleOpenSettings = async () => {
+    setSettingsError(null);
+    try {
+      await openOptionsPage();
+    } catch (error: unknown) {
+      setSettingsError(
+        error instanceof Error ? error.message : 'Could not open PageMemory settings.',
+      );
+    }
+  };
+
+  return (
+    <main className="flex max-h-[600px] min-h-[480px] w-[380px] max-w-full flex-col overflow-y-auto bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 pb-3 pt-3 backdrop-blur">
+        <div className="mb-3 flex items-center justify-between">
+          <a
+            aria-label="PageMemory home"
+            className="inline-flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            href="#home"
+          >
+            <span
+              aria-hidden="true"
+              className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-sm font-bold text-white shadow-sm"
+            >
+              P
+            </span>
+            <span className="text-sm font-bold tracking-tight text-slate-950">PageMemory</span>
+          </a>
+          <IconButton aria-label="Open settings" onClick={() => void handleOpenSettings()} size="sm">
+            <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 20 20">
+              <path
+                d="M8.5 2.5h3l.5 1.8 1.4.8 1.8-.6 1.5 2.6-1.3 1.3v1.6l1.3 1.3-1.5 2.6-1.8-.6-1.4.8-.5 1.8h-3L8 14.1l-1.4-.8-1.8.6-1.5-2.6 1.3-1.3V8.4L3.3 7.1l1.5-2.6 1.8.6L8 4.3l.5-1.8Z"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.4"
+              />
+              <circle cx="10" cy="9.2" r="2.2" stroke="currentColor" strokeWidth="1.4" />
+            </svg>
+          </IconButton>
+        </div>
+        <SearchInput
+          aria-label="Search saved pages"
+          className="py-2"
+          label="Search saved pages"
+          onChange={(event) => setSearch(event.target.value)}
+          onClear={() => setSearch('')}
+          placeholder="Search pages or websites"
+          value={search}
+        />
+        {settingsError && (
+          <p className="mt-2 text-xs text-rose-700" role="alert">
+            {settingsError}
+          </p>
+        )}
       </header>
 
-      <section
-        aria-live="polite"
-        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-      >
-        <h2 className="text-base font-semibold text-slate-900">Current page</h2>
+      <div className="space-y-5 px-4 py-4">
         {state.status === 'loading' && (
-          <p className="mt-2 text-sm text-slate-600">Connecting to the active tab…</p>
+          <Card className="p-4">
+            <LoadingState label="Loading your saved pages…" />
+          </Card>
         )}
+
+        {state.status === 'error' && (
+          <ErrorState
+            action={
+              <Button onClick={onRetry} size="sm">
+                Try again
+              </Button>
+            }
+            message={state.message}
+            title="Your library couldn't load"
+          />
+        )}
+
         {state.status === 'ready' && (
-          <div className="mt-2">
-            <p className="break-words text-sm text-slate-800">
-              {state.page.title || state.page.url}
-            </p>
-            <p className="mt-1 break-all text-xs text-slate-500">{state.page.url}</p>
-            <Button
-              className="mt-4 w-full"
-              disabled={state.saveStatus === 'saving' || state.saveStatus === 'saved'}
-              onClick={onSave}
-            >
-              {state.saveStatus === 'saving'
-                ? 'Saving…'
-                : state.saveStatus === 'saved'
-                  ? 'Saved'
-                  : state.saveStatus === 'error'
-                    ? 'Try saving again'
-                    : 'Save page'}
-            </Button>
-            {state.saveStatus === 'saved' && (
-              <p className="mt-2 text-sm text-emerald-700">This page is saved.</p>
+          <>
+            {state.currentPageError && (
+              <ErrorState
+                className="p-3"
+                message={state.currentPageError}
+                title="Current page unavailable"
+              />
             )}
-            {state.saveStatus === 'unsaved' && (
-              <p className="mt-2 text-sm text-slate-600">This page is not saved yet.</p>
+
+            {state.pages.length === 0 ? (
+              <section aria-labelledby="continue-heading">
+                <SectionHeader id="continue-heading" title="Continue reading" />
+                <EmptyState
+                  action={
+                    state.currentPage ? (
+                      <Button
+                        className="w-full"
+                        disabled={state.saveStatus === 'saving'}
+                        onClick={onSave}
+                        size="sm"
+                      >
+                        {state.saveStatus === 'saving'
+                          ? 'Saving…'
+                          : state.saveStatus === 'error'
+                            ? 'Try saving again'
+                            : 'Save current page'}
+                      </Button>
+                    ) : undefined
+                  }
+                  className="mt-2"
+                  description={
+                    state.currentPage
+                      ? `Save “${state.currentPage.title || state.currentPage.domain}” to continue reading later.`
+                      : 'Pages you save will be ready for you here.'
+                  }
+                  title="Nothing saved yet"
+                />
+                {state.saveStatus === 'error' && state.saveError && (
+                  <p className="mt-2 text-xs text-rose-700" role="alert">
+                    {state.saveError}
+                  </p>
+                )}
+              </section>
+            ) : (
+              <section aria-labelledby="continue-heading">
+                <SectionHeader id="continue-heading" title="Continue reading" />
+                {continuePage && (
+                  <Card className="mt-2 overflow-hidden p-3">
+                    <div className="flex items-start gap-3">
+                      <PageFavicon page={continuePage} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="success">Saved</Badge>
+                          <span className="truncate text-xs text-slate-500">
+                            {continuePage.domain}
+                          </span>
+                        </div>
+                        <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-slate-900">
+                          {continuePage.title || continuePage.domain}
+                        </h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {continuePage.progress > 0
+                            ? `${Math.round(continuePage.progress)}% read`
+                            : 'Ready when you are'}
+                        </p>
+                      </div>
+                    </div>
+                    <ProgressBar
+                      className="mt-3"
+                      label={`${Math.round(continuePage.progress)}% reading progress`}
+                      value={continuePage.progress}
+                    />
+                    <a
+                      className="mt-3 flex min-h-9 items-center justify-center rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                      href={continuePage.url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Continue reading
+                    </a>
+                  </Card>
+                )}
+              </section>
             )}
-            {state.saveStatus === 'error' && (
-              <p className="mt-2 text-sm text-rose-700" role="alert">
+
+            <section aria-labelledby="recent-heading">
+              <SectionHeader
+                count={search ? recentPages.length : state.pages.length}
+                id="recent-heading"
+                title="Recent pages"
+              />
+              {state.pages.length === 0 ? null : recentPages.length > 0 ? (
+                <Card className="mt-2 divide-y divide-slate-100 p-1.5">
+                  {recentPages.map((page) => (
+                    <PageRow key={page.id} page={page} />
+                  ))}
+                </Card>
+              ) : (
+                <EmptyState
+                  className="mt-2"
+                  description="Try another title or website name."
+                  title="No pages match your search"
+                />
+              )}
+            </section>
+
+            {state.currentPage && state.saveStatus !== 'saved' && state.pages.length > 0 && (
+              <Card className="flex items-center justify-between gap-3 p-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-800">Save this page</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {state.currentPage.title || state.currentPage.domain}
+                  </p>
+                </div>
+                <Button
+                  disabled={state.saveStatus === 'saving'}
+                  onClick={onSave}
+                  size="sm"
+                  variant="secondary"
+                >
+                  {state.saveStatus === 'saving' ? 'Saving…' : 'Save'}
+                </Button>
+              </Card>
+            )}
+
+            {state.saveStatus === 'error' && state.saveError && (
+              <p className="text-xs text-rose-700" role="alert">
                 {state.saveError}
               </p>
             )}
-          </div>
+          </>
         )}
-        {state.status === 'error' && (
-          <div className="mt-2">
-            <ErrorState
-              action={
-                <Button onClick={onRetry} size="sm">
-                  Try again
-                </Button>
-              }
-              message={state.message}
-            />
-          </div>
-        )}
-      </section>
+      </div>
+      <footer className="mt-auto border-t border-slate-200 px-4 py-2.5 text-center text-[11px] text-slate-400">
+        Your saved pages stay on this device
+      </footer>
     </main>
+  );
+}
+
+interface SectionHeaderProps {
+  readonly id: string;
+  readonly title: string;
+  readonly count?: number;
+}
+
+function SectionHeader({ id, title, count }: SectionHeaderProps) {
+  return (
+    <div className="flex items-center justify-between">
+      <h2 className="text-sm font-semibold text-slate-900" id={id}>
+        {title}
+      </h2>
+      {count !== undefined && <span className="text-xs text-slate-400">{count}</span>}
+    </div>
   );
 }

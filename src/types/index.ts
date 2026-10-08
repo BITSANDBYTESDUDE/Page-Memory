@@ -6,6 +6,7 @@ export const MESSAGE_TYPES = [
   'GET_CURRENT_PAGE',
   'SAVE_PAGE',
   'GET_PAGE',
+  'GET_PAGES',
   'GET_READING_STATE',
   'UPDATE_PROGRESS',
   'RESTORE_POSITION',
@@ -28,6 +29,17 @@ export type PageMetadata = PageInfo;
 export interface PageLookupResult {
   readonly isSaved: boolean;
 }
+
+export interface SavedPageSummary {
+  readonly id: string;
+  readonly url: string;
+  readonly canonicalUrl: string;
+  readonly title: string;
+  readonly domain: string;
+  readonly favicon: string | null;
+  readonly progress: number;
+  readonly lastReadAt: string | null;
+}
 export type { StoredReadingState } from './reading';
 
 export interface PageSaveResult {
@@ -46,6 +58,7 @@ export interface RequestPayloads {
   readonly GET_CURRENT_PAGE: undefined;
   readonly SAVE_PAGE: PageInfo;
   readonly GET_PAGE: { readonly url: string };
+  readonly GET_PAGES: undefined;
   readonly GET_READING_STATE: { readonly url: string };
   readonly UPDATE_PROGRESS: ReadingProgress;
   readonly RESTORE_POSITION: { readonly url: string; readonly scrollY: number };
@@ -55,6 +68,7 @@ export interface ResponsePayloads {
   readonly GET_CURRENT_PAGE: PageInfo;
   readonly SAVE_PAGE: PageSaveResult;
   readonly GET_PAGE: PageLookupResult;
+  readonly GET_PAGES: readonly SavedPageSummary[];
   readonly GET_READING_STATE: StoredReadingState | null;
   readonly UPDATE_PROGRESS: null;
   readonly RESTORE_POSITION: null;

@@ -62,6 +62,32 @@ export function getActiveTabId(): Promise<number> {
   });
 }
 
+export function openOptionsPage(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.openOptionsPage(() => {
+      const lastError = chrome.runtime.lastError;
+      if (lastError) {
+        reject(new Error(lastError.message ?? 'Could not open PageMemory settings.'));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+export function openPageInNewTab(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.create({ url }, () => {
+      const lastError = chrome.runtime.lastError;
+      if (lastError) {
+        reject(new Error(lastError.message ?? 'Could not open the saved page.'));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 export function registerRuntimeHandler(
   handler: (request: RuntimeRequest) => Promise<RuntimeReply>,
 ): void {

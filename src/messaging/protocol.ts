@@ -6,6 +6,7 @@ import {
   type RuntimeError,
   type RuntimeReply,
   type RuntimeRequest,
+  type SavedPageSummary,
   type StoredReadingState,
 } from '../types';
 
@@ -21,6 +22,18 @@ const isPageInfo = (value: unknown): value is PageInfo =>
   typeof value.hostname === 'string' &&
   typeof value.domain === 'string' &&
   (typeof value.favicon === 'string' || value.favicon === null);
+
+const isSavedPageSummary = (value: unknown): value is SavedPageSummary =>
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  typeof value.url === 'string' &&
+  typeof value.canonicalUrl === 'string' &&
+  typeof value.title === 'string' &&
+  typeof value.domain === 'string' &&
+  (typeof value.favicon === 'string' || value.favicon === null) &&
+  typeof value.progress === 'number' &&
+  Number.isFinite(value.progress) &&
+  (typeof value.lastReadAt === 'string' || value.lastReadAt === null);
 
 const isStoredReadingState = (value: unknown): value is StoredReadingState =>
   value === null ||
@@ -55,6 +68,8 @@ export function parseRuntimeRequest(value: unknown): RuntimeRequest | null {
       return isRecord(value.payload) && typeof value.payload.url === 'string'
         ? { type: value.type, payload: { url: value.payload.url } }
         : null;
+    case 'GET_PAGES':
+      return { type: value.type };
     case 'GET_READING_STATE':
       return isRecord(value.payload) && typeof value.payload.url === 'string'
         ? { type: value.type, payload: { url: value.payload.url } }
@@ -107,6 +122,8 @@ export function isRuntimeReply<K extends MessageType>(
       return isPageInfo(value.value);
     case 'GET_PAGE':
       return isRecord(value.value) && typeof value.value.isSaved === 'boolean';
+    case 'GET_PAGES':
+      return Array.isArray(value.value) && value.value.every(isSavedPageSummary);
     case 'GET_READING_STATE':
       return isStoredReadingState(value.value);
     case 'SAVE_PAGE':

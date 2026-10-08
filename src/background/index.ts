@@ -53,6 +53,29 @@ async function handleRuntimeRequest(request: RuntimeRequest): Promise<RuntimeRep
             : 'INTERNAL';
         return failureForRequest(request, code, message);
       }
+    case 'GET_PAGES':
+      try {
+        const pages = await pageRepository.getPages();
+        return success(
+          'GET_PAGES',
+          pages.map(
+            ({ id, url, canonicalUrl, title, domain, favicon, progress, lastReadAt }) => ({
+              id,
+              url,
+              canonicalUrl,
+              title,
+              domain,
+              favicon,
+              progress,
+              lastReadAt,
+            }),
+          ),
+        );
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Could not load saved pages.';
+        return failureForRequest(request, 'INTERNAL', message);
+      }
     case 'GET_READING_STATE':
       try {
         const page = await pageRepository.getPageByUrl(request.payload.url);
