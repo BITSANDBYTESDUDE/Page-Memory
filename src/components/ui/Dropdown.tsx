@@ -1,4 +1,5 @@
 import type { SelectHTMLAttributes } from 'react';
+import { useId } from 'react';
 import { cn, focusRing } from './utils';
 
 export interface DropdownOption {
@@ -12,8 +13,11 @@ export interface DropdownProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export function Dropdown({ className, label, options, id, ...props }: DropdownProps) {
+  const generatedId = useId();
+  const selectId = id ?? generatedId;
+
   return (
-    <label className="block text-sm font-medium text-slate-700" htmlFor={id}>
+    <label className="block text-sm font-medium text-slate-700" htmlFor={selectId}>
       {label && <span className="mb-1.5 block">{label}</span>}
       <select
         className={cn(
@@ -22,7 +26,7 @@ export function Dropdown({ className, label, options, id, ...props }: DropdownPr
           'focus:border-indigo-500',
           className,
         )}
-        id={id}
+        id={selectId}
         {...props}
       >
         {options.map((option) => (

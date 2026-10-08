@@ -13,7 +13,10 @@ export function LoadingState({ label = 'Loading', className }: LoadingStateProps
       className={cn('flex items-center gap-2 text-sm text-slate-500', className)}
       role="status"
     >
-      <span aria-hidden="true" className="h-3.5 w-3.5 animate-pulse rounded-full bg-indigo-500" />
+      <span
+        aria-hidden="true"
+        className="h-3.5 w-3.5 animate-pulse rounded-full bg-indigo-500 motion-reduce:animate-none"
+      />
       <span>{label}</span>
     </div>
   );

@@ -202,6 +202,23 @@ rejected.
 PageMemory/
 │
 ├── src/
+│   ├── components/
+│   │   └── ui/
+│   │       ├── Badge.tsx
+│   │       ├── Button.tsx
+│   │       ├── Card.tsx
+│   │       ├── Dropdown.tsx
+│   │       ├── EmptyState.tsx
+│   │       ├── ErrorState.tsx
+│   │       ├── IconButton.tsx
+│   │       ├── Input.tsx
+│   │       ├── LoadingState.tsx
+│   │       ├── Modal.tsx
+│   │       ├── ProgressBar.tsx
+│   │       └── SearchInput.tsx
+│   ├── design-system/
+│   │   ├── main.tsx
+│   │   └── preview.tsx
 │   ├── background/
 │   │   └── index.ts
 │   ├── utils/
@@ -291,13 +308,15 @@ npm install
 
 ## Development
 
-Start the development build:
+Start the Vite development server and open the design-system preview:
 
 ```bash
 npm run dev
 ```
 
-Depending on the project's Vite configuration, load the generated extension directory through Chrome's extension developer tools.
+Open [http://localhost:5173](http://localhost:5173) to browse the reusable UI
+primitives. The extension popup and options page can still be loaded separately
+from the production build through Chrome's extension developer tools.
 
 ---
 

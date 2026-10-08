@@ -12,6 +12,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
+        designSystem: `${projectRoot}/index.html`,
         popup: `${projectRoot}/popup.html`,
         options: `${projectRoot}/options.html`,
         background: `${projectRoot}/src/background/index.ts`,
