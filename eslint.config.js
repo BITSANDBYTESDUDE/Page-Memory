@@ -22,6 +22,7 @@ export default [
         console: 'readonly',
         document: 'readonly',
         window: 'readonly',
+        globalThis: 'readonly',
       },
     },
     plugins: {

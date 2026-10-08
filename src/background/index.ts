@@ -1,4 +1,5 @@
 import type { RuntimeReply, RuntimeRequest } from '../types';
+import type { ReadingPositionUpdate } from '../types/reading';
 import { failureForRequest, success } from '../messaging/protocol';
 import {
   getActiveTabId,
@@ -69,3 +70,23 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 registerRuntimeHandler(handleRuntimeRequest);
+
+chrome.runtime.onMessage.addListener((message: unknown, sender) => {
+  if (!isReadingPositionUpdate(message)) {
+    return;
+  }
+
+  console.debug('PageMemory reading position received.', {
+    tabId: sender.tab?.id,
+    progress: message.progress,
+  });
+});
+
+function isReadingPositionUpdate(message: unknown): message is ReadingPositionUpdate {
+  return (
+    typeof message === 'object' &&
+    message !== null &&
+    'type' in message &&
+    message.type === 'READING_POSITION_UPDATE'
+  );
+}
