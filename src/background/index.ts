@@ -59,7 +59,7 @@ async function handleRuntimeRequest(request: RuntimeRequest): Promise<RuntimeRep
         return success(
           'GET_PAGES',
           pages.map(
-            ({ id, url, canonicalUrl, title, domain, favicon, progress, lastReadAt }) => ({
+            ({
               id,
               url,
               canonicalUrl,
@@ -68,13 +68,38 @@ async function handleRuntimeRequest(request: RuntimeRequest): Promise<RuntimeRep
               favicon,
               progress,
               lastReadAt,
+              isFavorite,
+            }) => ({
+              id,
+              url,
+              canonicalUrl,
+              title,
+              domain,
+              favicon,
+              progress,
+              lastReadAt,
+              isFavorite,
             }),
           ),
         );
       } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : 'Could not load saved pages.';
+        const message = error instanceof Error ? error.message : 'Could not load saved pages.';
         return failureForRequest(request, 'INTERNAL', message);
+      }
+    case 'UPDATE_FAVORITE':
+      try {
+        await pageRepository.updatePage(request.payload.id, {
+          isFavorite: request.payload.isFavorite,
+        });
+        return success('UPDATE_FAVORITE', null);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Could not update favorite status.';
+        const code =
+          error instanceof StorageError && error.code === 'NOT_FOUND'
+            ? 'INVALID_REQUEST'
+            : 'INTERNAL';
+        return failureForRequest(request, code, message);
       }
     case 'GET_READING_STATE':
       try {

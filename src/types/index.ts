@@ -7,6 +7,7 @@ export const MESSAGE_TYPES = [
   'SAVE_PAGE',
   'GET_PAGE',
   'GET_PAGES',
+  'UPDATE_FAVORITE',
   'GET_READING_STATE',
   'UPDATE_PROGRESS',
   'RESTORE_POSITION',
@@ -39,6 +40,7 @@ export interface SavedPageSummary {
   readonly favicon: string | null;
   readonly progress: number;
   readonly lastReadAt: string | null;
+  readonly isFavorite: boolean;
 }
 export type { StoredReadingState } from './reading';
 
@@ -59,6 +61,7 @@ export interface RequestPayloads {
   readonly SAVE_PAGE: PageInfo;
   readonly GET_PAGE: { readonly url: string };
   readonly GET_PAGES: undefined;
+  readonly UPDATE_FAVORITE: { readonly id: string; readonly isFavorite: boolean };
   readonly GET_READING_STATE: { readonly url: string };
   readonly UPDATE_PROGRESS: ReadingProgress;
   readonly RESTORE_POSITION: { readonly url: string; readonly scrollY: number };
@@ -69,6 +72,7 @@ export interface ResponsePayloads {
   readonly SAVE_PAGE: PageSaveResult;
   readonly GET_PAGE: PageLookupResult;
   readonly GET_PAGES: readonly SavedPageSummary[];
+  readonly UPDATE_FAVORITE: null;
   readonly GET_READING_STATE: StoredReadingState | null;
   readonly UPDATE_PROGRESS: null;
   readonly RESTORE_POSITION: null;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { PopupState } from '../hooks/useCurrentPage';
 import type { SavedPageSummary } from '../types';
 import {
@@ -18,6 +18,7 @@ interface PopupProps {
   readonly state: PopupState;
   readonly onRetry: () => void;
   readonly onSave: () => void;
+  readonly onFavorite: (pageId: string) => void;
 }
 
 function recentTimestamp(timestamp: string | null): string {
@@ -64,33 +65,72 @@ function PageFavicon({ page }: { readonly page: SavedPageSummary }) {
   );
 }
 
-function PageRow({ page }: { readonly page: SavedPageSummary }) {
+function FavoriteIcon({ filled }: { readonly filled: boolean }) {
   return (
-    <a
-      className="flex min-w-0 items-center gap-3 rounded-lg p-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-      href={page.url}
-      rel="noreferrer"
-      target="_blank"
-      title={`Open ${page.title || page.domain}`}
+    <svg
+      aria-hidden="true"
+      fill={filled ? 'currentColor' : 'none'}
+      height="16"
+      viewBox="0 0 24 24"
+      width="16"
     >
-      <PageFavicon page={page} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-slate-800">
-          {page.title || page.domain}
-        </span>
-        <span className="mt-0.5 block truncate text-xs text-slate-500">
-          {page.domain} · {recentTimestamp(page.lastReadAt)}
-        </span>
-      </span>
-      <span aria-hidden="true" className="shrink-0 text-slate-400">
-        ↗
-      </span>
-    </a>
+      <path
+        d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+    </svg>
   );
 }
-
-export function Popup({ state, onRetry, onSave }: PopupProps) {
+function PageRow({
+  page,
+  onFavorite,
+}: {
+  readonly page: SavedPageSummary;
+  readonly onFavorite: (pageId: string) => void;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 rounded-lg p-2 transition-colors hover:bg-slate-50">
+      <a
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+        href={page.url}
+        rel="noreferrer"
+        target="_blank"
+        title={`Open ${page.title || page.domain}`}
+      >
+        <PageFavicon page={page} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-slate-800">
+            {page.title || page.domain}
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-slate-500">
+            {page.domain} · {recentTimestamp(page.lastReadAt)}
+          </span>
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-slate-400">
+          ↗
+        </span>
+      </a>
+      <IconButton
+        aria-label={
+          page.isFavorite
+            ? `Remove ${page.title || page.domain} from favorites`
+            : `Add ${page.title || page.domain} to favorites`
+        }
+        aria-pressed={page.isFavorite}
+        className={page.isFavorite ? 'text-amber-500 hover:text-amber-600' : undefined}
+        onClick={() => onFavorite(page.id)}
+        size="sm"
+      >
+        <FavoriteIcon filled={page.isFavorite} />
+      </IconButton>
+    </div>
+  );
+}
+export function Popup({ state, onRetry, onSave, onFavorite }: PopupProps) {
   const [search, setSearch] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,14 +138,19 @@ export function Popup({ state, onRetry, onSave }: PopupProps) {
   const continuePage = findContinuePage(pages);
 
   const searchQuery = search.trim().toLocaleLowerCase();
+  const visiblePages = useMemo(
+    () => (favoritesOnly ? pages.filter((page) => page.isFavorite) : pages),
+    [favoritesOnly, pages],
+  );
   const recentPages = useMemo(() => {
-    return pages
+    return visiblePages
       .filter((page) => {
         if (!searchQuery) return true;
         return `${page.title} ${page.domain} ${page.url}`.toLocaleLowerCase().includes(searchQuery);
       })
       .slice(0, 6);
-  }, [pages, searchQuery]);
+  }, [searchQuery, visiblePages]);
+  const favoritePages = useMemo(() => recentPages.filter((page) => page.isFavorite), [recentPages]);
 
   const handleOpenSettings = async () => {
     setSettingsError(null);
@@ -135,7 +180,11 @@ export function Popup({ state, onRetry, onSave }: PopupProps) {
             </span>
             <span className="text-sm font-bold tracking-tight text-slate-950">PageMemory</span>
           </a>
-          <IconButton aria-label="Open settings" onClick={() => void handleOpenSettings()} size="sm">
+          <IconButton
+            aria-label="Open settings"
+            onClick={() => void handleOpenSettings()}
+            size="sm"
+          >
             <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 20 20">
               <path
                 d="M8.5 2.5h3l.5 1.8 1.4.8 1.8-.6 1.5 2.6-1.3 1.3v1.6l1.3 1.3-1.5 2.6-1.8-.6-1.4.8-.5 1.8h-3L8 14.1l-1.4-.8-1.8.6-1.5-2.6 1.3-1.3V8.4L3.3 7.1l1.5-2.6 1.8.6L8 4.3l.5-1.8Z"
@@ -191,6 +240,39 @@ export function Popup({ state, onRetry, onSave }: PopupProps) {
                 message={state.currentPageError}
                 title="Current page unavailable"
               />
+            )}
+
+            {state.favoriteError && (
+              <p className="text-xs text-rose-700" role="alert">
+                {state.favoriteError}
+              </p>
+            )}
+
+            {state.pages.length > 0 && (
+              <section aria-labelledby="favorites-heading">
+                <SectionHeader
+                  count={favoritePages.length}
+                  id="favorites-heading"
+                  title="Favorites"
+                />
+                {favoritePages.length > 0 ? (
+                  <Card className="mt-2 divide-y divide-slate-100 p-1.5">
+                    {favoritePages.map((page) => (
+                      <PageRow key={page.id} onFavorite={onFavorite} page={page} />
+                    ))}
+                  </Card>
+                ) : (
+                  <EmptyState
+                    className="mt-2 p-4"
+                    description={
+                      search
+                        ? 'Try another search or favorite a page to see it here.'
+                        : 'Favorite pages will appear here for quick access.'
+                    }
+                    title="No favorites yet"
+                  />
+                )}
+              </section>
             )}
 
             {state.pages.length === 0 ? (
@@ -271,14 +353,25 @@ export function Popup({ state, onRetry, onSave }: PopupProps) {
 
             <section aria-labelledby="recent-heading">
               <SectionHeader
-                count={search ? recentPages.length : state.pages.length}
+                action={
+                  <Button
+                    aria-pressed={favoritesOnly}
+                    onClick={() => setFavoritesOnly((active) => !active)}
+                    size="sm"
+                    variant={favoritesOnly ? 'primary' : 'secondary'}
+                  >
+                    <FavoriteIcon filled={favoritesOnly} />
+                    Favorites only
+                  </Button>
+                }
+                count={search || favoritesOnly ? recentPages.length : state.pages.length}
                 id="recent-heading"
                 title="Recent pages"
               />
               {state.pages.length === 0 ? null : recentPages.length > 0 ? (
                 <Card className="mt-2 divide-y divide-slate-100 p-1.5">
                   {recentPages.map((page) => (
-                    <PageRow key={page.id} page={page} />
+                    <PageRow key={page.id} onFavorite={onFavorite} page={page} />
                   ))}
                 </Card>
               ) : (
@@ -328,15 +421,19 @@ interface SectionHeaderProps {
   readonly id: string;
   readonly title: string;
   readonly count?: number;
+  readonly action?: ReactNode;
 }
 
-function SectionHeader({ id, title, count }: SectionHeaderProps) {
+function SectionHeader({ id, title, count, action }: SectionHeaderProps) {
   return (
     <div className="flex items-center justify-between">
       <h2 className="text-sm font-semibold text-slate-900" id={id}>
         {title}
       </h2>
-      {count !== undefined && <span className="text-xs text-slate-400">{count}</span>}
+      <div className="flex items-center gap-2">
+        {count !== undefined && <span className="text-xs text-slate-400">{count}</span>}
+        {action}
+      </div>
     </div>
   );
 }

@@ -23,6 +23,13 @@ export function getPages(): Promise<RuntimeReply<'GET_PAGES'>> {
   return request({ type: 'GET_PAGES' });
 }
 
+export function updateFavorite(
+  id: string,
+  isFavorite: boolean,
+): Promise<RuntimeReply<'UPDATE_FAVORITE'>> {
+  return request({ type: 'UPDATE_FAVORITE', payload: { id, isFavorite } });
+}
+
 export function getReadingState(url: string): Promise<RuntimeReply<'GET_READING_STATE'>> {
   return request({ type: 'GET_READING_STATE', payload: { url } });
 }

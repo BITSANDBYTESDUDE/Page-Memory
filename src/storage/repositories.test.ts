@@ -2,11 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { StorageError } from './errors';
 import { PageRepository } from './PageRepository';
 import { SettingsRepository } from './SettingsRepository';
-import {
-  DATABASE_STORAGE_KEY,
-  StorageService,
-  type LocalStorageAdapter,
-} from './StorageService';
+import { DATABASE_STORAGE_KEY, StorageService, type LocalStorageAdapter } from './StorageService';
 import { DATABASE_SCHEMA_VERSION, type PageMemoryDatabase } from './models';
 
 class MemoryStorage implements LocalStorageAdapter {
@@ -100,9 +96,38 @@ describe('PageRepository', () => {
     expect(updated.isFavorite).toBe(true);
     expect(updated.tags).toEqual(['typescript']);
     expect(updated.createdAt).toBe(created.createdAt);
-    expect(Date.parse(updated.updatedAt)).toBeGreaterThanOrEqual(
-      Date.parse(created.updatedAt),
-    );
+    expect(Date.parse(updated.updatedAt)).toBeGreaterThanOrEqual(Date.parse(created.updatedAt));
+  });
+
+  it('persists favorite changes and supports unfavoriting', async () => {
+    const created = await repository.createPage({
+      url: 'https://example.com/favorite',
+      title: 'Favorite me',
+    });
+
+    await expect(repository.updatePage(created.id, { isFavorite: true })).resolves.toMatchObject({
+      id: created.id,
+      isFavorite: true,
+    });
+    await expect(repository.updatePage(created.id, { isFavorite: false })).resolves.toMatchObject({
+      id: created.id,
+      isFavorite: false,
+    });
+    await expect(repository.getPage(created.id)).resolves.toMatchObject({ isFavorite: false });
+  });
+
+  it('does not report a successful favorite update when storage fails', async () => {
+    const created = await repository.createPage({
+      url: 'https://example.com/favorite-failure',
+      title: 'Favorite failure',
+    });
+    adapter.failWrites = true;
+
+    await expect(repository.updatePage(created.id, { isFavorite: true })).rejects.toMatchObject({
+      code: 'WRITE_FAILED',
+    });
+    adapter.failWrites = false;
+    await expect(repository.getPage(created.id)).resolves.toMatchObject({ isFavorite: false });
   });
 
   it('deletes a page and reports whether it existed', async () => {
@@ -157,9 +182,9 @@ describe('PageRepository', () => {
       }),
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
 
-    await expect(
-      repository.updatePage('missing', { title: 'Missing' }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(repository.updatePage('missing', { title: 'Missing' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
   });
 });
 
@@ -218,9 +243,7 @@ describe('SettingsRepository and StorageService', () => {
     };
     adapter.value = malformedData;
 
-    await expect(new StorageService(adapter).initialize()).rejects.toBeInstanceOf(
-      StorageError,
-    );
+    await expect(new StorageService(adapter).initialize()).rejects.toBeInstanceOf(StorageError);
     expect(adapter.value).toBe(malformedData);
     expect(adapter.writeCount).toBe(0);
   });

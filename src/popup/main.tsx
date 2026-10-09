@@ -5,12 +5,13 @@ import { Popup } from './Popup';
 import { useCurrentPage } from '../hooks/useCurrentPage';
 
 function PopupRoot() {
-  const { state, reload, saveCurrentPage } = useCurrentPage();
+  const { state, reload, saveCurrentPage, toggleFavorite } = useCurrentPage();
   return (
     <Popup
       state={state}
       onRetry={() => void reload()}
       onSave={() => void saveCurrentPage()}
+      onFavorite={(pageId) => void toggleFavorite(pageId)}
     />
   );
 }

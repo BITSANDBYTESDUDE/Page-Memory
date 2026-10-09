@@ -33,7 +33,8 @@ const isSavedPageSummary = (value: unknown): value is SavedPageSummary =>
   (typeof value.favicon === 'string' || value.favicon === null) &&
   typeof value.progress === 'number' &&
   Number.isFinite(value.progress) &&
-  (typeof value.lastReadAt === 'string' || value.lastReadAt === null);
+  (typeof value.lastReadAt === 'string' || value.lastReadAt === null) &&
+  typeof value.isFavorite === 'boolean';
 
 const isStoredReadingState = (value: unknown): value is StoredReadingState =>
   value === null ||
@@ -70,6 +71,15 @@ export function parseRuntimeRequest(value: unknown): RuntimeRequest | null {
         : null;
     case 'GET_PAGES':
       return { type: value.type };
+    case 'UPDATE_FAVORITE':
+      return isRecord(value.payload) &&
+        typeof value.payload.id === 'string' &&
+        typeof value.payload.isFavorite === 'boolean'
+        ? {
+            type: value.type,
+            payload: { id: value.payload.id, isFavorite: value.payload.isFavorite },
+          }
+        : null;
     case 'GET_READING_STATE':
       return isRecord(value.payload) && typeof value.payload.url === 'string'
         ? { type: value.type, payload: { url: value.payload.url } }
@@ -124,6 +134,8 @@ export function isRuntimeReply<K extends MessageType>(
       return isRecord(value.value) && typeof value.value.isSaved === 'boolean';
     case 'GET_PAGES':
       return Array.isArray(value.value) && value.value.every(isSavedPageSummary);
+    case 'UPDATE_FAVORITE':
+      return value.value === null;
     case 'GET_READING_STATE':
       return isStoredReadingState(value.value);
     case 'SAVE_PAGE':

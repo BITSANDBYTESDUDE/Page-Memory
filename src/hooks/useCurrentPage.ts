@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { getCurrentPage, getPages, savePage } from '../messaging/client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getCurrentPage, getPages, savePage, updateFavorite } from '../messaging/client';
 import type { PageInfo, SavedPageSummary } from '../types';
 
 export type PopupState =
@@ -12,24 +12,22 @@ export type PopupState =
       readonly currentPageError: string | null;
       readonly saveStatus: 'saved' | 'unsaved' | 'saving' | 'unavailable' | 'error';
       readonly saveError?: string;
+      readonly favoriteError: string | null;
     };
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-function isPageSaved(
-  currentPage: PageInfo | null,
-  pages: readonly SavedPageSummary[],
-): boolean {
+function isPageSaved(currentPage: PageInfo | null, pages: readonly SavedPageSummary[]): boolean {
   return (
-    currentPage !== null &&
-    pages.some((page) => page.canonicalUrl === currentPage.canonicalUrl)
+    currentPage !== null && pages.some((page) => page.canonicalUrl === currentPage.canonicalUrl)
   );
 }
 
 export function useCurrentPage() {
   const [state, setState] = useState<PopupState>({ status: 'loading' });
+  const favoriteOperationIds = useRef(new Map<string, number>());
 
   const reload = useCallback(async () => {
     setState({ status: 'loading' });
@@ -52,10 +50,7 @@ export function useCurrentPage() {
           currentPageError = currentPageReply.error.message;
         }
       } catch (error: unknown) {
-        currentPageError = getErrorMessage(
-          error,
-          'Could not detect the current webpage.',
-        );
+        currentPageError = getErrorMessage(error, 'Could not detect the current webpage.');
       }
 
       setState({
@@ -69,6 +64,7 @@ export function useCurrentPage() {
             : isPageSaved(currentPage, pagesReply.value)
               ? 'saved'
               : 'unsaved',
+        favoriteError: null,
       });
     } catch (error: unknown) {
       setState({
@@ -79,11 +75,7 @@ export function useCurrentPage() {
   }, []);
 
   const saveCurrentPage = useCallback(async () => {
-    if (
-      state.status !== 'ready' ||
-      state.currentPage === null ||
-      state.saveStatus === 'saving'
-    ) {
+    if (state.status !== 'ready' || state.currentPage === null || state.saveStatus === 'saving') {
       return;
     }
 
@@ -129,6 +121,7 @@ export function useCurrentPage() {
         currentPage: currentPageReply.value,
         currentPageError: null,
         saveStatus: 'saved',
+        favoriteError: null,
       });
     } catch (error: unknown) {
       setState({
@@ -139,9 +132,49 @@ export function useCurrentPage() {
     }
   }, [state]);
 
+  const toggleFavorite = useCallback(
+    async (pageId: string) => {
+      if (state.status !== 'ready') return;
+      const page = state.pages.find((candidate) => candidate.id === pageId);
+      if (!page) return;
+
+      const nextFavorite = !page.isFavorite;
+      const operationId = (favoriteOperationIds.current.get(pageId) ?? 0) + 1;
+      favoriteOperationIds.current.set(pageId, operationId);
+      setState({
+        ...state,
+        favoriteError: null,
+        pages: state.pages.map((candidate) =>
+          candidate.id === pageId ? { ...candidate, isFavorite: nextFavorite } : candidate,
+        ),
+      });
+
+      try {
+        const reply = await updateFavorite(pageId, nextFavorite);
+        if (reply.ok) return;
+        throw new Error(reply.error.message);
+      } catch (error: unknown) {
+        if (favoriteOperationIds.current.get(pageId) !== operationId) return;
+        const message =
+          error instanceof Error ? error.message : 'Could not update favorite status.';
+        setState((latestState) => {
+          if (latestState.status !== 'ready') return latestState;
+          return {
+            ...latestState,
+            favoriteError: message,
+            pages: latestState.pages.map((candidate) =>
+              candidate.id === pageId ? { ...candidate, isFavorite: page.isFavorite } : candidate,
+            ),
+          };
+        });
+      }
+    },
+    [state],
+  );
+
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  return { state, reload, saveCurrentPage };
+  return { state, reload, saveCurrentPage, toggleFavorite };
 }
